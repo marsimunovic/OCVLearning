@@ -15,5 +15,11 @@ CONFIG   -= app_bundle
 TEMPLATE = app
 
 
-SOURCES += main.cpp
+SOURCES += main.cpp \
+    key.cpp \
+    calibinit.cpp
 LIBS += `pkg-config opencv --libs`
+
+HEADERS += \
+    key.h \
+    calibinit.h
