@@ -1,0 +1,4 @@
+#ifndef DETECTKEYBOARD_H
+#define DETECTKEYBOARD_H
+
+#endif // DETECTKEYBOARD_H
