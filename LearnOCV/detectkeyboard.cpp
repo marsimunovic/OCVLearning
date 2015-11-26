@@ -261,14 +261,27 @@ int detectKeyboard(cv::Mat src, cv::Size pattern)
 
         /// Finding bounding rectangle of keyboard
         /** Extracting keyboard mask*/
-
+    waitKey(0);
     Mat thresh;
     adaptiveThreshold(res, thresh, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 19, 2);
 
     vector<vector<Point> > contours;
     vector<Vec4i> hierarchy;
-    findContours(thresh, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE);
 
+    findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+    Mat drawing;
+    cvtColor(thresh, drawing, COLOR_GRAY2BGR);
+    for(size_t i = 0; i < contours.size(); ++i)
+    {
+        double area = contourArea(contours[i]);
+        if(area < 200.0)
+            continue;
+        drawContours(drawing, contours, i, Scalar(0, 255, 0));
+    }
+    namedWindow("Debug Window", 0);
+    imshow("Debug Window", drawing);
+    waitKey(0);
     double max_area = 0.0;
     size_t best_cnt = 0;
     for(size_t i = 0; i < contours.size(); ++i)
@@ -474,4 +487,244 @@ closex = close.copy()
     return 0;
 }
 
+int histTestHUE(cv::Mat& src)
+{
+    Mat hsv;
+    cvtColor(src, hsv, CV_BGR2HSV);
 
+        // Quantize the hue to 30 levels
+        // and the saturation to 32 levels
+        int hbins = 30, sbins = 32;
+        int histSize[] = {hbins, sbins};
+        // hue varies from 0 to 179, see cvtColor
+        float hranges[] = { 0, 180 };
+        // saturation varies from 0 (black-gray-white) to
+        // 255 (pure spectrum color)
+        float sranges[] = { 0, 256 };
+        const float* ranges[] = { hranges, sranges };
+        MatND hist;
+        // we compute the histogram from the 0-th and 1-st channels
+        int channels[] = {0, 1};
+
+        calcHist( &hsv, 1, channels, Mat(), // do not use mask
+                 hist, 2, histSize, ranges,
+                 true, // the histogram is uniform
+                 false );
+        double maxVal=0;
+        minMaxLoc(hist, 0, &maxVal, 0, 0);
+
+        int scale = 10;
+        Mat histImg = Mat::zeros(sbins*scale, hbins*10, CV_8UC3);
+
+        for( int h = 0; h < hbins; h++ )
+            for( int s = 0; s < sbins; s++ )
+            {
+                float binVal = hist.at<float>(h, s);
+                int intensity = cvRound(binVal*255/maxVal);
+                rectangle( histImg, Point(h*scale, s*scale),
+                            Point( (h+1)*scale - 1, (s+1)*scale - 1),
+                            Scalar::all(intensity),
+                            CV_FILLED );
+            }
+
+        namedWindow( "Source", 0 );
+        imshow( "Source", src );
+
+        namedWindow( "Transformed", 0 );
+        imshow( "Transformed", hsv );
+
+        namedWindow( "H-S Histogram", 1 );
+        imshow( "H-S Histogram", histImg );
+        waitKey(0);
+        return 0;
+}
+
+int edgeDetection(cv::Mat& image)
+{
+    Mat edges, pyr;
+    //pyrDown(image, pyr, Size(image.cols/2, image.rows/2));
+    //pyrUp(pyr, image, image.size());
+    vector<vector<Point> > contours;
+
+    Canny(image, edges, 70, 130, 5);
+
+
+    namedWindow("Edge Canny", 0);
+
+    imshow("Edge Canny", image);
+    waitKey(0);
+    return 0;
+}
+
+
+int histTestC1(cv::Mat& src)
+{
+    Mat dst, hsv;
+    cvtColor(src, hsv, CV_BGR2HSV);
+    cvtColor(hsv, dst, CV_8UC1);
+    int histSize = 256; //number of bins
+    float range[] = {0, 256};
+    const float* histRange = {range};
+    bool uniform{true};
+    bool accumulate{false};
+    Mat bw_hist;
+    vector<Mat> group(1);
+    group[0] = dst.clone();
+
+    int channs[] = {0};
+    calcHist(&group[0], 1, channs, Mat(), bw_hist, 1, &histSize, &histRange, uniform, accumulate);
+    Mat thresh;
+    cvtColor(src, thresh, COLOR_BGR2GRAY);
+    adaptiveThreshold(thresh, thresh, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 19, 2);
+
+    // Draw the histograms for BW image
+    int hist_w = 512; int hist_h = 400;
+    int bin_w = cvRound( (double) hist_w/histSize );
+    Mat histImage(hist_h, hist_w, CV_8UC1, Scalar(0, 0, 0));
+    normalize(bw_hist, bw_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+
+    /// Draw for each channel
+    for( int i = 1; i < histSize; i++ )
+    {
+        line( histImage, Point( bin_w*(i-1), hist_h - cvRound(bw_hist.at<float>(i-1)) ) ,
+                         Point( bin_w*(i), hist_h - cvRound(bw_hist.at<float>(i)) ),
+                         Scalar( 255, 0, 0), 2, 8, 0  );
+
+    }
+    int erosion_size = 1;
+    Mat kernel = getStructuringElement(MORPH_CROSS,
+                                                     Size(2*erosion_size + 1, 2*erosion_size + 1));
+    /// Display
+    ///
+    namedWindow("calcHist Demo", 0 );
+    imshow("calcHist Demo", histImage );
+    namedWindow("calcHist Demo1", 0 );
+    imshow("calcHist Demo1", thresh );
+    waitKey(0);
+    return 0;
+}
+
+int histTest(cv::Mat& src)
+{
+    Mat dst;
+
+    /// Separate the image in 3 places ( B, G and R )
+     vector<Mat> bgr_planes;
+     cvtColor(src, src, CV_BGR2HSV);
+     split( src, bgr_planes );
+
+
+
+     /// Establish the number of bins
+     int histSize = 256;
+
+     /// Set the ranges ( for B,G,R) )
+     float range[] = { 0, 256 } ;
+     const float* histRange = { range };
+
+     bool uniform = true; bool accumulate = false;
+
+     Mat b_hist, g_hist, r_hist;
+
+     /// Compute the histograms:
+     calcHist( &bgr_planes[0], 1, 0, Mat(), b_hist, 1, &histSize, &histRange, uniform, accumulate );
+     calcHist( &bgr_planes[1], 1, 0, Mat(), g_hist, 1, &histSize, &histRange, uniform, accumulate );
+     calcHist( &bgr_planes[2], 1, 0, Mat(), r_hist, 1, &histSize, &histRange, uniform, accumulate );
+
+     // Draw the histograms for B, G and R
+     int hist_w = 512; int hist_h = 400;
+     int bin_w = cvRound( (double) hist_w/histSize );
+
+     Mat histImage( hist_h, hist_w, CV_8UC3, Scalar( 0,0,0) );
+
+     /// Normalize the result to [ 0, histImage.rows ]
+     normalize(b_hist, b_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat() );
+     normalize(g_hist, g_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat() );
+     normalize(r_hist, r_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat() );
+
+     /// Draw for each channel
+     for( int i = 1; i < histSize; i++ )
+     {
+         line( histImage, Point( bin_w*(i-1), hist_h - cvRound(b_hist.at<float>(i-1)) ) ,
+                          Point( bin_w*(i), hist_h - cvRound(b_hist.at<float>(i)) ),
+                          Scalar( 255, 0, 0), 2, 8, 0  );
+         line( histImage, Point( bin_w*(i-1), hist_h - cvRound(g_hist.at<float>(i-1)) ) ,
+                          Point( bin_w*(i), hist_h - cvRound(g_hist.at<float>(i)) ),
+                          Scalar( 0, 255, 0), 2, 8, 0  );
+         line( histImage, Point( bin_w*(i-1), hist_h - cvRound(r_hist.at<float>(i-1)) ) ,
+                          Point( bin_w*(i), hist_h - cvRound(r_hist.at<float>(i)) ),
+                          Scalar( 0, 0, 255), 2, 8, 0  );
+     }
+
+     /// Display
+     namedWindow("Source", 0);
+     imshow("Source", bgr_planes[2]);
+     namedWindow("calcHist Demo", CV_WINDOW_AUTOSIZE );
+     imshow("calcHist Demo", histImage );
+
+     waitKey(0);
+
+
+    return 0;
+}
+
+
+int fourier_analysis(char const* filename)
+{
+    //const char* filename = argc >=2 ? argv[1] : "lena.jpg";
+
+    Mat I = imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
+    if( I.empty())
+        return -1;
+
+    Mat padded;                            //expand input image to optimal size
+    int m = getOptimalDFTSize( I.rows );
+    int n = getOptimalDFTSize( I.cols ); // on the border add zero values
+    copyMakeBorder(I, padded, 0, m - I.rows, 0, n - I.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    Mat planes[] = {Mat_<float>(padded), Mat::zeros(padded.size(), CV_32F)};
+    Mat complexI;
+    merge(planes, 2, complexI);         // Add to the expanded another plane with zeros
+
+    dft(complexI, complexI);            // this way the result may fit in the source matrix
+
+    // compute the magnitude and switch to logarithmic scale
+    // => log(1 + sqrt(Re(DFT(I))^2 + Im(DFT(I))^2))
+    split(complexI, planes);                   // planes[0] = Re(DFT(I), planes[1] = Im(DFT(I))
+    magnitude(planes[0], planes[1], planes[0]);// planes[0] = magnitude
+    Mat magI = planes[0];
+
+    magI += Scalar::all(1);                    // switch to logarithmic scale
+    log(magI, magI);
+
+    // crop the spectrum, if it has an odd number of rows or columns
+    magI = magI(Rect(0, 0, magI.cols & -2, magI.rows & -2));
+
+    // rearrange the quadrants of Fourier image  so that the origin is at the image center
+    int cx = magI.cols/2;
+    int cy = magI.rows/2;
+
+    Mat q0(magI, Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
+    Mat q1(magI, Rect(cx, 0, cx, cy));  // Top-Right
+    Mat q2(magI, Rect(0, cy, cx, cy));  // Bottom-Left
+    Mat q3(magI, Rect(cx, cy, cx, cy)); // Bottom-Right
+
+    Mat tmp;                           // swap quadrants (Top-Left with Bottom-Right)
+    q0.copyTo(tmp);
+    q3.copyTo(q0);
+    tmp.copyTo(q3);
+
+    q1.copyTo(tmp);                    // swap quadrant (Top-Right with Bottom-Left)
+    q2.copyTo(q1);
+    tmp.copyTo(q2);
+
+    normalize(magI, magI, 0, 1, CV_MINMAX); // Transform the matrix with float values into a
+                                            // viewable image form (float between values 0 and 1).
+
+    imshow("Input Image"       , I   );    // Show the result
+    namedWindow("spectrum magnitude", 0);
+    imshow("spectrum magnitude", magI);
+    waitKey();
+
+    return 0;
+}
