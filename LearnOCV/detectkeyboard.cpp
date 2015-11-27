@@ -233,14 +233,42 @@ int detectKeyboard(cv::Mat src, cv::Size pattern)
     /** Closing operation*/
 
     Mat img(src.size(), src.type());
-    GaussianBlur(src, img, Size(5,5), 0); //nosie reduction
+    GaussianBlur(src, img, Size(5,5), 5); //nosie reduction
+    //cv::addWeighted(src, 1.5, img, -0.5, 0, img);
     Mat gray;
     cvtColor(img, gray, COLOR_BGR2GRAY);
+    Mat thresh(img.size(), CV_8UC1);
+    threshold(gray, thresh, 145, 255, THRESH_BINARY);
+    Mat kernelxy = getStructuringElement(MORPH_RECT, Size(3,3));
+    morphologyEx(thresh, thresh, MORPH_DILATE, kernelxy);
+    morphologyEx(thresh, thresh, MORPH_ERODE, kernelxy, Point(-1, -1), 2);
+//    Mat curves;
+//    Canny(thresh, curves, 110, 200);
+//    vector<Vec4i> lines;
+//    HoughLinesP(curves, lines, 1, CV_PI/180,  155, 30, 10 );
+//    Mat frameReference = Mat::zeros(thresh.size(), CV_8UC3);
+//    for( size_t i = 1; i < lines.size(); i++ )
+//    {
+//        Vec4i l = lines[i];
+//        Vec4i prev_l = lines[i-1];
+//        Point a(l[0], l[1]);
+//        Point b(prev_l[2], prev_l[3]);
+//        double res = cv::norm(a-b);//Euclidian distance
+//        cout << i << " : " << res << endl;
+//        line( frameReference, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
+//    }
+
+    namedWindow("Sharpen", 0);
+    imshow("Sharpen", thresh);
+    waitKey(0);
+
     Mat kernel1 = getStructuringElement(MORPH_ELLIPSE, Size(11,11));
 
     Mat close;
     morphologyEx(gray, close, MORPH_CLOSE, kernel1);
     namedWindow("Step 1", WINDOW_NORMAL);
+    imshow("Step 1", gray);
+    waitKey(0);
     Mat img2;
     gray.convertTo(img2, CV_32FC1);
     Mat div;
@@ -256,29 +284,34 @@ int detectKeyboard(cv::Mat src, cv::Size pattern)
     //for(int i = 0; i < 20; ++i)
       //  std::cout << div.at<float>(0, i) << " : " << static_cast<int>(res.at<uchar>(0, i)) <<  std::endl;
     cvtColor(res, res2, COLOR_GRAY2BGR);
+    cout << "depth" << res.depth() << endl;
     imshow("Step 1", res);
 //=====================================================================================
 
         /// Finding bounding rectangle of keyboard
         /** Extracting keyboard mask*/
     waitKey(0);
-    Mat thresh;
-    adaptiveThreshold(res, thresh, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 19, 2);
-
+    //Mat thresh;
+    //adaptiveThreshold(res, thresh, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 19, 2);
+    //threshold(res, thresh, 200, 255, THRESH_BINARY);
+    cout << thresh.channels() << endl;
+    namedWindow("Debug Window", 0);
+    imshow("Debug Window", thresh);
+    waitKey(0);
     vector<vector<Point> > contours;
     vector<Vec4i> hierarchy;
 
     findContours(thresh, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 
-    Mat drawing;
-    cvtColor(thresh, drawing, COLOR_GRAY2BGR);
+    Mat drawing = Mat::zeros(thresh.size(), CV_8UC1);
     for(size_t i = 0; i < contours.size(); ++i)
     {
         double area = contourArea(contours[i]);
         if(area < 200.0)
             continue;
-        drawContours(drawing, contours, i, Scalar(0, 255, 0));
+        drawContours(drawing, contours, i, 255);
     }
+
     namedWindow("Debug Window", 0);
     imshow("Debug Window", drawing);
     waitKey(0);
@@ -304,7 +337,8 @@ int detectKeyboard(cv::Mat src, cv::Size pattern)
     namedWindow("Step 2", WINDOW_NORMAL);
    // moveWindow("Step 2", 0, res.size().height/2);
     imshow("Step 2", res);
-    //waitKey(0);
+    waitKey(0);
+    cout << "Perform Sobel derivatives@" << endl;
 
 //=====================================================================================
 
@@ -330,6 +364,8 @@ for cnt in contour:
 close = cv2.morphologyEx(close,cv2.MORPH_CLOSE,None,iterations = 2)
 closex = close.copy()
 */
+
+    res = thresh;
     Mat kernelx = getStructuringElement(MORPH_RECT, Size(2,10));
 
     Mat dx;
@@ -383,6 +419,7 @@ closex = close.copy()
     dilate(closey, closey, dily , Point(-1, -1), 2);
     namedWindow("Step 4", WINDOW_NORMAL);
     imshow("Step 4", closey);
+    waitKey(0);
 
 //=====================================================================================
 
@@ -393,6 +430,7 @@ closex = close.copy()
     bitwise_and(closex, closey, intersection);
     namedWindow("Step 5", WINDOW_NORMAL);
     imshow("Step 5", intersection);
+    waitKey(0);
 
 //=====================================================================================
 

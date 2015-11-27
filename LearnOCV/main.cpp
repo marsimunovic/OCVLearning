@@ -13,7 +13,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-    string imageName("../data/images/piano_plain1.jpg");
+    string imageName("../data/images/piano_plain2.jpg");
     //string imageName("../data/images/sudoku.png");
     //string imageName("../data/images/keyboard.jpg");
    //string imageName("../data/images/piano_render.jpg");
