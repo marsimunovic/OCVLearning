@@ -11,15 +11,22 @@ QT       -= gui
 TARGET = LearnOCV
 CONFIG   += console
 CONFIG   -= app_bundle
+QMAKE_CXXFLAGS += -std=c++11
 
 TEMPLATE = app
 
 
-SOURCES += main.cpp \
+SOURCES += \
     key.cpp \
-    calibinit.cpp
+    calibinit.cpp \
+    detectkeyboard.cpp \
+    main1.cpp \
+    main.cpp \
+    detectkeys.cpp
 LIBS += `pkg-config opencv --libs`
 
 HEADERS += \
     key.h \
-    calibinit.h
+    calibinit.h \
+    detectkeyboard.h \
+    detectkeys.h

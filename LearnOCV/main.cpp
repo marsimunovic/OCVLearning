@@ -1,4 +1,5 @@
 #include "detectkeyboard.h"
+#include "detectkeys.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -25,7 +26,8 @@ int main(int argc, char *argv[])
 
     Mat image;
     image = imread(imageName.c_str(), IMREAD_COLOR); //read the file
-    detectKeyboard(image, Size(8,5));
+    detectKeys(image);
+    //detectKeyboard(image, Size(8,5));
     //histTestC1(image);
    // edgeDetection(image);
     //fourier_analysis(imageName.c_str());
