@@ -3,12 +3,13 @@
 #include <opencv2/highgui.hpp>
 
 #include <stdarg.h>
+#include <iostream>
 #include <vector>
 
 using namespace cv;
 using namespace std;
 
-static int cvCheckKeyboard(cv::Mat &src, cv::Size size);
+static int cvCheckKeyboard(cv::Mat &src, cv::Mat& orig, cv::Size size);
 
 
 int thresh = 50, N = 11;
@@ -175,6 +176,7 @@ int cvFindKeyboardCorners(cv::Mat &src, cv::Size pattern_size,
 
     Mat tresh_img(src.size(), CV_8UC1);
     Mat norm_img(src.size(), CV_8UC1);
+    Mat src_orig = src;
 
     if(src.channels() != 1 || (flags & CV_CALIB_CB_NORMALIZE_IMAGE))
     {
@@ -193,7 +195,7 @@ int cvFindKeyboardCorners(cv::Mat &src, cv::Size pattern_size,
     }
 
 
-    cvCheckKeyboard(src, Size());
+    cvCheckKeyboard(src, src_orig, Size());
 
 
     return found;
@@ -206,7 +208,7 @@ int cvFindKeyboardCorners(cv::Mat &src, cv::Size pattern_size,
 /// returns 1 if a keyboar can be in this image, 0 if there is no keyboard
 /// or -1 in case of error
 
-int cvCheckKeyboard(cv::Mat &src, cv::Size size)
+int cvCheckKeyboard(cv::Mat &src, cv::Mat &orig, cv::Size size)
 {
     if(src.channels() > 1)
     {
@@ -235,34 +237,51 @@ int cvCheckKeyboard(cv::Mat &src, cv::Size size)
         && !result; thresh_level += 20.0f)
     {
         cv::threshold(white, thresh, thresh_level + black_white_gap,
-                      255, CV_THRESH_BINARY);
-        vector<vector<Point> > squares;
-        findSquares(thresh, squares);
-        drawSquares(thresh, squares);
-        squares.clear();
+                      255, CV_THRESH_BINARY | CV_THRESH_OTSU);
+        //vector<vector<Point> > squares;
+        //findSquares(thresh, squares);
+        //drawSquares(thresh, squares);
+        //squares.clear();
 
         vector<vector<Point> > contours;
         vector<Vec4i> hierarchy;
 
         findContours(thresh, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
-        cv::threshold(black, thresh, thresh_level, 255, CV_THRESH_BINARY_INV);
 
+
+        // test each contour
+        Mat drawing = Mat::zeros( thresh.size(), CV_8UC3 );
+        for( size_t i = 0; i < contours.size(); i++ )
+        {
+            // approximate contour with accuracy proportional
+            // to the contour perimeter
+            vector<Point> approx;
+            //approxPolyDP(Mat(contours[i]), contours[i], arcLength(Mat(contours[i]), true)*0.01, true);
+            //std::cout << "Prev size: " << contours[i].size() << " new size: " << approx.size() << std::endl;
+            RNG rng(12345);
+            Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+             drawContours( src, contours, i, color, 2, 8, hierarchy, 0, Point() );
+           }
+        namedWindow("1", WINDOW_NORMAL);
+        imshow("1", src);
+        waitKey(0);
+
+        cv::threshold(black, thresh, thresh_level, 255, CV_THRESH_BINARY_INV);
         findContours(thresh, contours, hierarchy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0) );
         /// Draw contours
         ///
         ///
         ///
-          Mat drawing = Mat::zeros( thresh.size(), CV_8UC3 );
+          ///Mat drawing = Mat::zeros( thresh.size(), CV_8UC3 );
+        /*
           RNG rng(12345);
           for( int i = 0; i< contours.size(); i++ )
              {
                Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
                drawContours( drawing, contours, i, color, 2, 8, hierarchy, 0, Point() );
              }
+        */
 
-        namedWindow("1", WINDOW_NORMAL);
-        imshow("1", drawing);
-        waitKey(0);
     }
 
 

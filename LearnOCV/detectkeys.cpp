@@ -62,21 +62,6 @@ void cornerHarris_demo(cv::Mat& src)
 }
 
 
-void BlobDetector(cv::Mat& src)
-{
-    Size dims = src.size();
-    int h = dims.height;
-    int w = dims.width;
-    //randomly create search points
-    RNG rng(12345);
-
-
-    //create ROIs around search points
-
-    //find bounded white objects
-    //and create a list of results for further processing
-
-}
 
 
 void findVerticalSegments(cv::Mat& res, cv::Mat& closex)
@@ -189,8 +174,139 @@ void calculateHough(cv::Mat& src)
 
 }
 
+int calc_treshold(cv::Mat& src)
+{
+    Mat dst, bw_hist;
+    //cvtColor(src, hsv, CV_BGR2HSV);
+    //cvtColor(src, dst, CV_8UC1);
+    int histSize = 256; //number of bins
+    float range[] = {0, 256};
+    const float* histRange = {range};
+    int channs[] = {0};
+
+    calcHist(&src, 1, channs, Mat(), bw_hist, 1, &histSize, &histRange);
+    int min_ind = 130;
+    int max_ind = 180;
+    float min_val = static_cast<float>(src.size().area());
+    //find best position for mode separation
+    //TODO: determine mode ranges instead of fixed min_ind and max_ind
+    for(int i = min_ind; i < max_ind; ++i)
+    {
+        if(min_val >= bw_hist.at<float>(i))
+        {
+            //cout << i << " : " << bw_hist.at<float>(i) << endl;
+            min_val = bw_hist.at<float>(i);
+            min_ind = i;
+        }
+    }
+/*
+    int hist_w = 256; int hist_h = 400;
+    int bin_w = cvRound( (double) hist_w/histSize );
+    Mat histImage(hist_h, hist_w, CV_8UC1, Scalar(0, 0, 0));
+    normalize(bw_hist, bw_hist, 0, histImage.rows, NORM_MINMAX, -1, Mat());
+
+    /// Draw for each channel
+    for( int i = 1; i < histSize; i++ )
+    {
+        line( histImage, Point( bin_w*(i-1), hist_h - cvRound(bw_hist.at<float>(i-1)) ) ,
+                         Point( bin_w*(i), hist_h - cvRound(bw_hist.at<float>(i)) ),
+                         Scalar( 255, 0, 0), 2, 8, 0  );
+        line(histImage, Point(min_ind, 0), Point(min_ind, 399), Scalar(255, 0, 0), 2);
+
+    }
+
+    namedWindow("calcHist Demo", 0 );
+    imshow("calcHist Demo", histImage );
+*/
+    return min_ind;
+}
+
+
+void detect_contours(cv::Mat& src)
+{
+    vector<vector<Point>> contours;
+    Mat closex = Mat::zeros(src.size(), CV_8UC3);
+     Mat brief = Mat::zeros(src.size(), CV_8UC3);
+    findContours(src, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
+    //findContours(src, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+    namedWindow("Contours", WINDOW_NORMAL);
+    namedWindow("Brief", WINDOW_NORMAL);
+    size_t min_len = src.size().width/15;
+    Scalar colors[3] = {Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255)};
+    int cntr = 0;
+    int brcntr = 0;
+    for(size_t i = 0; i < contours.size(); ++i)
+    {
+
+            if(contours[i].size() < min_len)
+                continue;
+            vector<Point> brief_contour;
+            double epsilon = arcLength(Mat(contours[i]), true)*0.01;
+            approxPolyDP(contours[i], brief_contour, epsilon, false);
+            for(size_t j = 1; j < brief_contour.size(); ++j)
+            {
+                Point start = brief_contour[j-1];
+                Point end = brief_contour[j];
+                line(brief, start, end, colors[brcntr], 2);
+                brcntr = (brcntr+1) % 3;
+            }
+
+            drawContours(closex, contours, i, colors[cntr], 2);
+
+            cntr = (cntr+1) % 3;
+            imshow("Brief", brief);
+            imshow("Contours", closex);
+            waitKey();
+    }
+    //Mat dilx = getStructuringElement(MORPH_RECT, Size(3,3));
+    //dilate(closex, closex, dilx , Point(-1, -1), 2);
+
+}
+
 int detectKeys(cv::Mat& src)
 {
+
+    int const n_src_parts = 4;
+    //split image in 4 parts of equal width
+    int src_h = src.size().height;
+    int src_w = src.size().width;
+    int segment_w = src_w/n_src_parts;
+    //last segment width my differ if number is not divisible with 4
+    int last_segment_w = src_w - (n_src_parts-1)*segment_w;
+    cv::Mat quarter[n_src_parts];
+
+    std::string win_name = "Segment ";
+    //each segment is processed separately in order
+    //to get better local parameters and reduce
+    //camera position influence
+    cv::Mat src_C1(src.size(), CV_8UC1);
+    GaussianBlur(src, src, Size(5, 5), 3, 3);
+    cvtColor(src, src_C1, COLOR_BGR2GRAY, 1);
+    cout << src_C1.type() << endl;
+    for(int i = 0; i < n_src_parts; ++i)
+    {
+
+        quarter[i] = cv::Mat(src_C1, Rect(i*segment_w, 0,
+                     (i < n_src_parts -1)? segment_w : last_segment_w, src_h));
+        //determine image "energy distribution" in order to
+        //get the best possible tresholding
+
+        int thresh_val = calc_treshold(quarter[i]);
+        cout << "thresh value " << thresh_val << endl;
+
+        cv::Mat bw_quarter[n_src_parts];
+
+        threshold(quarter[i], bw_quarter[i], thresh_val, 255, THRESH_BINARY);
+
+        //perform analysis of black-n-white segment
+        //in order to extract geometrical shapes
+        detect_contours(bw_quarter[i]);
+
+        namedWindow(win_name + char(i + 49), 0);
+        imshow(win_name + char(i + 49), bw_quarter[i]);
+        waitKey();
+    }
+    return 0;
 
 
     Mat img(src.size(), src.type());
