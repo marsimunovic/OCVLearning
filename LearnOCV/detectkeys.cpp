@@ -235,14 +235,42 @@ void detect_contours(cv::Mat& src)
     Scalar colors[3] = {Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255)};
     int cntr = 0;
     int brcntr = 0;
+    /// Find the convex hull object for each contour
+//      vector<vector<Point> >hull( contours.size() );
+//      for( int i = 0; i < contours.size(); i++ )
+//         {  convexHull( Mat(contours[i]), hull[i], false ); }
+
+
+//      /// Draw contours + hull results
+//      namedWindow( "Hull demo", 0 );
+//      Mat drawing = Mat::zeros( src.size(), CV_8UC3 );
+//      for( int i = 0; i< contours.size(); i++ )
+//         {
+//          if(contours[i].size() < min_len)
+//                          continue;
+//           cntr = (cntr+1) % 3;
+//           Scalar color = colors[cntr];
+//           drawContours( drawing, contours, i, color, 1, 8, vector<Vec4i>(), 0, Point() );
+//           imshow( "Hull demo", drawing );
+//           waitKey(0);
+//           cntr = (cntr+1) % 3;
+//           color = colors[cntr];
+//           drawContours( drawing, hull, i, color, 1, 8, vector<Vec4i>(), 0, Point() );
+//           /// Show in a window
+//           imshow( "Hull demo", drawing );
+//           waitKey(0);
+//         }
+
+
+
     for(size_t i = 0; i < contours.size(); ++i)
     {
 
             if(contours[i].size() < min_len)
                 continue;
             vector<Point> brief_contour;
-            double epsilon = arcLength(Mat(contours[i]), true)*0.01;
-            approxPolyDP(contours[i], brief_contour, epsilon, false);
+            //double epsilon = arcLength(Mat(contours[i]), true)*0.01;
+            approxPolyDP(contours[i], brief_contour, 20, false);
             for(size_t j = 1; j < brief_contour.size(); ++j)
             {
                 Point start = brief_contour[j-1];
