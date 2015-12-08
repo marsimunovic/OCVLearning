@@ -1,4 +1,5 @@
 #include "detectkeys.h"
+#include "sline.h"
 
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -222,7 +223,7 @@ int calc_treshold(cv::Mat& src)
 }
 
 
-void detect_contours(cv::Mat& src)
+void detect_contours(cv::Mat& src, vector<vector<Point>>& approx_contours)
 {
     vector<vector<Point>> contours;
     Mat closex = Mat::zeros(src.size(), CV_8UC3);
@@ -278,17 +279,72 @@ void detect_contours(cv::Mat& src)
                 line(brief, start, end, colors[brcntr], 2);
                 brcntr = (brcntr+1) % 3;
             }
+            approx_contours.push_back(std::move(brief_contour));
 
             drawContours(closex, contours, i, colors[cntr], 2);
 
             cntr = (cntr+1) % 3;
-            imshow("Brief", brief);
-            imshow("Contours", closex);
-            waitKey();
+//            imshow("Brief", brief);
+//            imshow("Contours", closex);
+//            waitKey();
     }
     //Mat dilx = getStructuringElement(MORPH_RECT, Size(3,3));
     //dilate(closex, closex, dilx , Point(-1, -1), 2);
 
+}
+
+int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
+{
+    std::vector<SLine> vertical_lines;
+    std::vector<SLine> horizontal_lines;
+
+    for(auto& approx_contour : approx_contours)
+    {
+        for(size_t i = 1; i < approx_contour.size(); ++i)
+        {
+            Point start = approx_contour[i-1];
+            Point end = approx_contour[i];
+            SLine l(start.x, start.y, end.x, end.y);
+            if(l.inclination() > (M_PI/6))
+            {
+                //verticalish
+                l.to_upwardy();
+                vertical_lines.push_back(std::move(l));
+            }
+            else
+            {
+                //horizontalish
+                l.to_righty();
+                horizontal_lines.push_back(std::move(l));
+            }
+        }
+    }
+
+    std::cout << "start sorting " << endl;
+    std::sort(vertical_lines.begin(), vertical_lines.end(),
+              [](SLine const& first, SLine const& second)
+              {
+                return SLine::compare_by_x(first, second);
+              });
+    std::sort(horizontal_lines.begin(), horizontal_lines.end(),
+              [](SLine const& first, SLine const& second)
+              {
+                return SLine::compare_by_y(first, second);
+              });
+
+    Mat drawing = Mat::zeros(src.size(), src.type());
+
+    namedWindow("VerticalHorizontal", 0);
+    for(auto &vertical_line : vertical_lines)
+    {
+        SLine::Point pt1 = vertical_line.start_point();
+        SLine::Point pt2 = vertical_line.end_point();
+        cv::line(drawing, Point(pt1.x, pt1.y), Point(pt2.x, pt2.y), 255, 2);
+        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
+        imshow("VerticalHorizontal", drawing);
+        waitKey(0);
+    }
+    return 0;
 }
 
 int detectKeys(cv::Mat& src)
@@ -296,6 +352,7 @@ int detectKeys(cv::Mat& src)
 
     int const n_src_parts = 4;
     //split image in 4 parts of equal width
+
     int src_h = src.size().height;
     int src_w = src.size().width;
     int segment_w = src_w/n_src_parts;
@@ -328,7 +385,11 @@ int detectKeys(cv::Mat& src)
 
         //perform analysis of black-n-white segment
         //in order to extract geometrical shapes
-        detect_contours(bw_quarter[i]);
+        vector<vector<Point>> approx_contours;
+        detect_contours(bw_quarter[i], approx_contours);
+
+        //use detected lines to detect possible keys
+        detect_key_candidates(bw_quarter[i], approx_contours);
 
         namedWindow(win_name + char(i + 49), 0);
         imshow(win_name + char(i + 49), bw_quarter[i]);
