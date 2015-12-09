@@ -78,7 +78,7 @@ bool SLine::is_vertical_to(SLine &other_line, int epsilon)
 
 void SLine::to_upwardy()
 {
-    if(start.y > end.y)
+    if(start.y < end.y)
         std::swap(start, end);
 }
 
@@ -90,7 +90,7 @@ void SLine::to_righty()
 
 double SLine::inclination()
 {
-    return atan(abs(dy()/(dx() + 0.00000000001)));
+    return abs(atan(abs(dy()/(dx() + 0.00000000001))));
 }
 
 double SLine::inclination_4quadrant()
@@ -117,6 +117,15 @@ int SLine::dy()
 double SLine::norm()
 {
     return sqrt(dx()*dx() + dy()*dy());
+}
+
+double SLine::calculate_angle( SLine::Point pt1, SLine::Point pt2, SLine::Point pt0 )
+{
+    double dx1 = pt1.x - pt0.x;
+    double dy1 = pt1.y - pt0.y;
+    double dx2 = pt2.x - pt0.x;
+    double dy2 = pt2.y - pt0.y;
+    return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
 }
 
 

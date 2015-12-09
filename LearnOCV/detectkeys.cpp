@@ -285,11 +285,12 @@ void detect_contours(cv::Mat& src, vector<vector<Point>>& approx_contours)
 
             cntr = (cntr+1) % 3;
 //            imshow("Brief", brief);
-//            imshow("Contours", closex);
-//            waitKey();
+
     }
     //Mat dilx = getStructuringElement(MORPH_RECT, Size(3,3));
     //dilate(closex, closex, dilx , Point(-1, -1), 2);
+    imshow("Contours", closex);
+    waitKey();
 
 }
 
@@ -297,6 +298,10 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
 {
     std::vector<SLine> vertical_lines;
     std::vector<SLine> horizontal_lines;
+    int min_x = src.size().width*0.01;
+    int max_x = src.size().width*0.98;
+    int min_vertical_len = src.size().height*0.1;
+    //int min_horiz_len = src.size().height*0.05;
 
     for(auto& approx_contour : approx_contours)
     {
@@ -304,16 +309,23 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
         {
             Point start = approx_contour[i-1];
             Point end = approx_contour[i];
+            if(start.x < min_x || start.x > max_x || end.x < min_x || end.x > max_x)
+                continue;
+
             SLine l(start.x, start.y, end.x, end.y);
             if(l.inclination() > (M_PI/6))
             {
                 //verticalish
+                if(norm(start-end) < min_vertical_len)
+                    continue;
                 l.to_upwardy();
                 vertical_lines.push_back(std::move(l));
             }
             else
             {
                 //horizontalish
+                //if(norm(start-end) < min_horiz_len)
+                  //  continue;
                 l.to_righty();
                 horizontal_lines.push_back(std::move(l));
             }
@@ -329,22 +341,129 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
     std::sort(horizontal_lines.begin(), horizontal_lines.end(),
               [](SLine const& first, SLine const& second)
               {
-                return SLine::compare_by_y(first, second);
+                return SLine::compare_by_x(first, second);
               });
 
     Mat drawing = Mat::zeros(src.size(), src.type());
 
-    namedWindow("VerticalHorizontal", 0);
+    std::vector<SLine> vertical_filtered;
+    for(size_t i = 1; i < vertical_lines.size(); ++i)
+    {
+        SLine::Point center1 = vertical_lines[i-1].center_point();
+        SLine::Point center2 = vertical_lines[i].center_point();
+
+
+
+
+        double incl1 = vertical_lines[i-1].inclination();
+        double incl2 = vertical_lines[i].inclination();
+        if((abs(center1.x - center2.x) < min_x) && cv::abs(incl1-incl2) < 0.08)
+        {
+            double norm1 = vertical_lines[i-1].norm();
+            double norm2 = vertical_lines[i].norm();
+            size_t int_to_push = (norm1 > norm2)? i-1: i;
+            double ratio = MAX(norm1, norm2)/MIN(norm1, norm2);
+            if(ratio < 1.05)
+            {
+                vertical_filtered.push_back(vertical_lines[int_to_push]);
+                ++i;
+                continue;
+            }
+        }
+        {
+            vertical_filtered.push_back(vertical_lines[i-1]);
+            if(i == vertical_lines.size() - 1)
+            {
+                vertical_filtered.push_back(vertical_lines[i]);
+            }
+        }
+
+    }
+    std::swap(vertical_filtered, vertical_lines);
+
+//    namedWindow("Original", 0);
+//    imshow("Original", src);
+//    waitKey(0);
+
+//    namedWindow("VerticalHorizontal", 0);
+//    for(auto &vertical_line : vertical_lines)
+//    {
+//        SLine::Point pt1 = vertical_line.start_point();
+//        SLine::Point pt2 = vertical_line.end_point();
+//        cv::line(drawing, Point(pt1.x, pt1.y), Point(pt2.x, pt2.y), 255, 2);
+//        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
+//        imshow("VerticalHorizontal", drawing);
+//        waitKey(0);
+//    }
+
+//    for(auto &horizontal_line : horizontal_lines)
+//    {
+//        SLine::Point pt1 = horizontal_line.start_point();
+//        SLine::Point pt2 = horizontal_line.end_point();
+//        cv::line(drawing, Point(pt1.x, pt1.y), Point(pt2.x, pt2.y), 255, 2);
+//        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
+//        imshow("VerticalHorizontal", drawing);
+//        waitKey(0);
+//    }
+
     for(auto &vertical_line : vertical_lines)
     {
-        SLine::Point pt1 = vertical_line.start_point();
-        SLine::Point pt2 = vertical_line.end_point();
-        cv::line(drawing, Point(pt1.x, pt1.y), Point(pt2.x, pt2.y), 255, 2);
-        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
-        imshow("VerticalHorizontal", drawing);
-        waitKey(0);
+        for(auto &horizontal_line: horizontal_lines)
+        {
+
+        }
     }
     return 0;
+}
+
+// helper function:
+// finds a cosine of angle between vectors
+// from pt0->pt1 and from pt0->pt2
+static double angle( Point pt1, Point pt2, Point pt0 )
+{
+    double dx1 = pt1.x - pt0.x;
+    double dy1 = pt1.y - pt0.y;
+    double dx2 = pt2.x - pt0.x;
+    double dy2 = pt2.y - pt0.y;
+    return acos((dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10));
+}
+
+
+
+void extract_geometry(vector<vector<cv::Point>> &approx_contours, cv::Size src_sz)
+{
+    //first extract average vertical and horizontal orientation
+    //find all possible key candidates using contours
+    Mat drawing = Mat::zeros(src_sz, CV_8UC1);
+    namedWindow("StepbyStep", 0);
+
+    for(auto &approx_contour : approx_contours)
+    {
+
+        int min_distance = MAX(src_sz.width, src_sz.height);
+        cv::Point contour_start = approx_contour[0];
+        size_t N_points = approx_contour.size();
+        cv::Point contour_end = approx_contour[N_points-1];
+        cv::line(drawing, approx_contour[0], approx_contour[1], 255, 2);
+        for(size_t i = 1; i < N_points-1; ++i)
+        {
+            //calculate angle between contours
+            //SLine l1(approx_contour[i], approx_contour[i-1]);
+            //SLine l2(approx_contour[i], approx_contour[i+1]);
+
+            double rad = angle(approx_contour[i-1], approx_contour[i+1], approx_contour[i]);
+            double distance = cv::norm(approx_contour[i] - contour_start);
+            cv::line(drawing, approx_contour[i], approx_contour[i+1], 255, 2);
+            std::cout << "angle = " << 180.0*rad/M_PI << std::endl;
+            //        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
+            imshow("StepbyStep", drawing);
+            waitKey(0);
+
+
+
+        }
+    }
+
 }
 
 int detectKeys(cv::Mat& src)
@@ -389,7 +508,10 @@ int detectKeys(cv::Mat& src)
         detect_contours(bw_quarter[i], approx_contours);
 
         //use detected lines to detect possible keys
-        detect_key_candidates(bw_quarter[i], approx_contours);
+        detect_key_candidates(quarter[i], approx_contours);
+
+
+        extract_geometry(approx_contours, bw_quarter[i].size());
 
         namedWindow(win_name + char(i + 49), 0);
         imshow(win_name + char(i + 49), bw_quarter[i]);

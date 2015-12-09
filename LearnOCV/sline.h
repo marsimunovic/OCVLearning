@@ -19,9 +19,11 @@ public:
     SLine(int x1, int y1, int x2, int y2);
     Point start_point(){return start;}
     Point end_point(){return end;}
+    Point center_point(){return Point((start.x+end.x)/2, (start.y+end.y)/2);}
 
     static bool compare_by_x(SLine const& first, SLine const &second);
     static bool compare_by_y(SLine const& first, SLine const &second);
+    static double calculate_angle(SLine::Point pt1, SLine::Point pt2, SLine::Point pt0);
 
     bool is_parallel_to(SLine& other_line, int epsilon = 0);
     bool is_vertical_to(SLine& other_line, int epsilon = 0);
