@@ -22,11 +22,15 @@ SOURCES += \
     detectkeyboard.cpp \
     main1.cpp \
     main.cpp \
-    detectkeys.cpp
+    detectkeys.cpp \
+    sline.cpp \
+    math_functions.cpp
 LIBS += `pkg-config opencv --libs`
 
 HEADERS += \
     key.h \
     calibinit.h \
     detectkeyboard.h \
-    detectkeys.h
+    detectkeys.h \
+    sline.h \
+    math_functions.h
