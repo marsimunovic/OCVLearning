@@ -35,6 +35,7 @@ bool SLine::compare_by_y(SLine const &first, SLine const &second)
     return (first.start.y + first.end.y) < (second.start.y + second.end.y);
 }
 
+
 bool SLine::is_parallel_to(SLine &other_line, int epsilon)
 {
     double dot_prod = static_cast<double>(dot_product(other_line));

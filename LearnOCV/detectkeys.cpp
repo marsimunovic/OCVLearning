@@ -1,3 +1,4 @@
+#include "math_functions.h"
 #include "detectkeys.h"
 #include "sline.h"
 
@@ -333,10 +334,13 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
     }
 
     std::cout << "start sorting " << endl;
+    int height = src.size().height - 1;
     std::sort(vertical_lines.begin(), vertical_lines.end(),
-              [](SLine const& first, SLine const& second)
+              [&height](SLine const& first, SLine const& second)
               {
-                return SLine::compare_by_x(first, second);
+                double dist1 = line_point_dist(first.start_cvpt(), first.end_cvpt(), cv::Point(0, height));
+                double dist2 = line_point_dist(second.start_cvpt(), second.end_cvpt(), cv::Point(0, height));
+                return dist1 < dist2;
               });
     std::sort(horizontal_lines.begin(), horizontal_lines.end(),
               [](SLine const& first, SLine const& second)
@@ -381,20 +385,12 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
     }
     std::swap(vertical_filtered, vertical_lines);
 
-//    namedWindow("Original", 0);
-//    imshow("Original", src);
-//    waitKey(0);
+    namedWindow("Original", 0);
+    imshow("Original", src);
+    waitKey(0);
 
-//    namedWindow("VerticalHorizontal", 0);
-//    for(auto &vertical_line : vertical_lines)
-//    {
-//        SLine::Point pt1 = vertical_line.start_point();
-//        SLine::Point pt2 = vertical_line.end_point();
-//        cv::line(drawing, Point(pt1.x, pt1.y), Point(pt2.x, pt2.y), 255, 2);
-//        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
-//        imshow("VerticalHorizontal", drawing);
-//        waitKey(0);
-//    }
+    namedWindow("VerticalHorizontal", 0);
+
 
 //    for(auto &horizontal_line : horizontal_lines)
 //    {
@@ -406,13 +402,55 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
 //        waitKey(0);
 //    }
 
-    for(auto &vertical_line : vertical_lines)
+
+    SLine::Point ptt1 = vertical_lines[0].start_point();
+    SLine::Point ptt2 = vertical_lines[0].end_point();
+    cv::line(drawing, Point(ptt1.x, ptt1.y), Point(ptt2.x, ptt2.y), 255, 2);
+    imshow("VerticalHorizontal", drawing);
+    waitKey(0);
+    for(size_t i = 0; i < vertical_lines.size(); ++i)
     {
-        for(auto &horizontal_line: horizontal_lines)
+        vector<SLine> key_candidate;
+
+        for(size_t j = i + 1; j < i+2; ++j)
         {
+            SLine::Point pt1 = vertical_lines[j].start_point();
+            SLine::Point pt2 = vertical_lines[j].end_point();
+            cv::line(drawing, Point(pt1.x, pt1.y), Point(pt2.x, pt2.y), 255, 2);
+            cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
+
+            cv::Point l1_s  = vertical_lines[i].start_cvpt();
+            cv::Point l2_s  = vertical_lines[j].start_cvpt();
+            cv::Point l1_e  = vertical_lines[i].end_cvpt();
+            cv::Point l2_e  = vertical_lines[j].end_cvpt();
+            //compare y of the top
+            double top12_ratio = ::max_ratio(l1_s.y,l2_s.y);
+            //compare y of the bottom
+            double btm12_ratio = ::max_ratio(l1_e.y,l2_e.y);
+            //if both approx equal full key or black key or narrow part of the key
+            if((top12_ratio > 0.9 && top12_ratio < 1.1) && (btm12_ratio > 0.9 && btm12_ratio < 1.1))
+            {
+                cout << "candidate for full key (white or black) or  narrow part" << endl;
+            }
+
+
+            //if lower of one equal to upper of second T, J or L shaped key
+            double topbtm12_ratio = ::max_ratio(l1_s.y, l2_e.y);
+            if(topbtm12_ratio > 0.9 && topbtm12_ratio < 1.1)
+            {
+                cout << "T or L shaped key" << endl;
+            }
+            double btmtop12_ratio = ::max_ratio(l1_e.y, l2_s.y);
+            if(btmtop12_ratio > 0.9 && btmtop12_ratio < 1.1)
+            {
+                cout << "T or J shaped key" << endl;
+            }
+            imshow("VerticalHorizontal", drawing);
+            waitKey(0);
 
         }
     }
+
     return 0;
 }
 
@@ -511,7 +549,7 @@ int detectKeys(cv::Mat& src)
         detect_key_candidates(quarter[i], approx_contours);
 
 
-        extract_geometry(approx_contours, bw_quarter[i].size());
+        //extract_geometry(approx_contours, bw_quarter[i].size());
 
         namedWindow(win_name + char(i + 49), 0);
         imshow(win_name + char(i + 49), bw_quarter[i]);
