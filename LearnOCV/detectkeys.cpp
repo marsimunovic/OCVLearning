@@ -15,6 +15,17 @@ using namespace cv;
 using namespace std;
 
 
+/// NOTES: in order to improve detection following improvements should be considered:
+///
+/// modify sline class in order to calculate some basic parameters like length,
+/// inclination and distance from origin of segment during construction
+/// modify sline class in order to accept construction using opencv Points
+///
+/// extraction of general inclination in the image segments
+/// extraction of line lengths in the image segments
+/// extraction of distances between lines in the image
+
+
 void createBWImage(cv::Mat& src, cv::Mat& img)
 {
     GaussianBlur(src, img, Size(5,5), 5); //nosie reduction
@@ -231,8 +242,8 @@ void detect_contours(cv::Mat& src, vector<vector<Point>>& approx_contours)
      Mat brief = Mat::zeros(src.size(), CV_8UC3);
     findContours(src, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
     //findContours(src, contours, hierarchy, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
-    namedWindow("Contours", WINDOW_NORMAL);
-    namedWindow("Brief", WINDOW_NORMAL);
+    //namedWindow("Contours", WINDOW_NORMAL);
+    //namedWindow("Brief", WINDOW_NORMAL);
     size_t min_len = src.size().width/15;
     Scalar colors[3] = {Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255)};
     int cntr = 0;
@@ -290,8 +301,8 @@ void detect_contours(cv::Mat& src, vector<vector<Point>>& approx_contours)
     }
     //Mat dilx = getStructuringElement(MORPH_RECT, Size(3,3));
     //dilate(closex, closex, dilx , Point(-1, -1), 2);
-    imshow("Contours", closex);
-    waitKey();
+    //imshow("Contours", closex);
+//    /waitKey();
 
 }
 
@@ -361,7 +372,7 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
 
         double incl1 = vertical_lines[i-1].inclination();
         double incl2 = vertical_lines[i].inclination();
-        if((abs(center1.x - center2.x) < min_x) && cv::abs(incl1-incl2) < 0.08)
+        if((abs(center1.x - center2.x) < min_x*2) && cv::abs(incl1-incl2) < 0.08)
         {
             double norm1 = vertical_lines[i-1].norm();
             double norm2 = vertical_lines[i].norm();
@@ -408,7 +419,9 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
     cv::line(drawing, Point(ptt1.x, ptt1.y), Point(ptt2.x, ptt2.y), 255, 2);
     imshow("VerticalHorizontal", drawing);
     waitKey(0);
-    for(size_t i = 0; i < vertical_lines.size(); ++i)
+    vector<int> candidates;
+    string cand = "";
+    for(size_t i = 0; i < vertical_lines.size()-1; ++i)
     {
         vector<SLine> key_candidate;
 
@@ -428,9 +441,30 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
             //compare y of the bottom
             double btm12_ratio = ::max_ratio(l1_e.y,l2_e.y);
             //if both approx equal full key or black key or narrow part of the key
-            if((top12_ratio > 0.9 && top12_ratio < 1.1) && (btm12_ratio > 0.9 && btm12_ratio < 1.1))
+            if((top12_ratio > 0.9 && top12_ratio < 1.1))
             {
-                cout << "candidate for full key (white or black) or  narrow part" << endl;
+                if((btm12_ratio > 0.9 && btm12_ratio < 1.1))
+                {
+                    cout << "candidate for full key (white or black) or  narrow part" << endl;
+                    candidates.push_back(0);
+                    cand += "O";
+                }
+                else
+                {
+                    if(vertical_lines[i].norm() > vertical_lines[j].norm())
+                    {
+                        candidates.push_back(3);
+                        cout << "J shaped key start" << endl;
+                        cand += "J";
+                    }
+                    else
+                    {
+                        candidates.push_back(4);
+                        cout << "L shaped key end?" << endl;
+                        cand += "L";
+                    }
+                }
+                //continue;
             }
 
 
@@ -438,18 +472,51 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
             double topbtm12_ratio = ::max_ratio(l1_s.y, l2_e.y);
             if(topbtm12_ratio > 0.9 && topbtm12_ratio < 1.1)
             {
+                candidates.push_back(1);
                 cout << "T or L shaped key" << endl;
+                cand += "T";
+                //continue;
             }
             double btmtop12_ratio = ::max_ratio(l1_e.y, l2_s.y);
             if(btmtop12_ratio > 0.9 && btmtop12_ratio < 1.1)
             {
+                candidates.push_back(2);
                 cout << "T or J shaped key" << endl;
+                cand += "T";
+                //continue;
             }
             imshow("VerticalHorizontal", drawing);
             waitKey(0);
-
         }
     }
+
+    std::cout << "Candidate : " << cand << std::endl;
+
+///  JT  - J shaped key
+///  TL  - L shaped key
+///  TOT - T shaped key
+///  O   - full sized key (black or white)
+///  OO  - undefined
+///
+
+
+//    vector<char> keyboard;
+//    for(size_t i = 0; i < candidates.size() - 1; ++i)
+//    {
+//        if(candidates[i] == 0)
+//        {
+//            if(candidates[i+1] == 0)
+//            {
+//                keyboard.push_back('F');
+//                ++i;
+//            }
+//        }
+//        else if(candidates[i] == 1)
+//        {
+//            if(candidates[i+1] == )
+//        }
+
+//    }
 
     return 0;
 }
