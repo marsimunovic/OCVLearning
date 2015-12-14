@@ -1,6 +1,7 @@
 #include "math_functions.h"
 #include "detectkeys.h"
 #include "sline.h"
+#include "cvline.h"
 
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -582,7 +583,7 @@ int detectKeys(cv::Mat& src)
     int segment_w = src_w/n_src_parts;
     //last segment width my differ if number is not divisible with 4
     int last_segment_w = src_w - (n_src_parts-1)*segment_w;
-    cv::Mat quarter[n_src_parts];
+    cv::Mat quarter[n_src_parts+n_src_parts-1];
 
     std::string win_name = "Segment ";
     //each segment is processed separately in order
@@ -592,18 +593,24 @@ int detectKeys(cv::Mat& src)
     GaussianBlur(src, src, Size(5, 5), 3, 3);
     cvtColor(src, src_C1, COLOR_BGR2GRAY, 1);
     cout << src_C1.type() << endl;
-    for(int i = 0; i < n_src_parts; ++i)
+    for(int i = 0; i < 2*n_src_parts-1; ++i)
     {
-
-        quarter[i] = cv::Mat(src_C1, Rect(i*segment_w, 0,
-                     (i < n_src_parts -1)? segment_w : last_segment_w, src_h));
+        if((i % 2) == 0)
+        {
+            quarter[i] = cv::Mat(src_C1, Rect((i/2)*segment_w, 0,
+                     (i < 2*n_src_parts -2)? segment_w : last_segment_w, src_h));
+        }
+        else
+        {
+            quarter[i] = cv::Mat(src_C1, Rect(segment_w/2*i, 0, segment_w, src_h));
+        }
         //determine image "energy distribution" in order to
         //get the best possible tresholding
 
         int thresh_val = calc_treshold(quarter[i]);
         cout << "thresh value " << thresh_val << endl;
 
-        cv::Mat bw_quarter[n_src_parts];
+        cv::Mat bw_quarter[2*n_src_parts-1];
 
         threshold(quarter[i], bw_quarter[i], thresh_val, 255, THRESH_BINARY);
 
@@ -611,6 +618,9 @@ int detectKeys(cv::Mat& src)
         //in order to extract geometrical shapes
         vector<vector<Point>> approx_contours;
         detect_contours(bw_quarter[i], approx_contours);
+        vector<CVLine> vertical_lines;
+        vector<CVLine> horizontal_lines;
+        //extract_lines(approx_contours, vertical_lines, horizontal_lines);
 
         //use detected lines to detect possible keys
         detect_key_candidates(quarter[i], approx_contours);

@@ -10,5 +10,8 @@ double line_point_dist(cv::Point const& A, cv::Point const& B,
                        cv::Point const& C, bool isSegm = false);
 
 double max_ratio(double val1, double val2);
+bool max_ratio(double val1, double val2, double &ratio);
+
+double line_inclination(cv::Point const &A, cv::Point const &B);
 
 #endif // MATH_FUNCTIONS_H
