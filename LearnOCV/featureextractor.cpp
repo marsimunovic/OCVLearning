@@ -42,8 +42,10 @@ void FeatureExtractor::extract_image_parameters()
     std::string win_name2 = "Vertical lines ";
     Mat drawing = Mat::zeros(src.size(), CV_8UC3);
     namedWindow(win_name2, 0);
-    Scalar colors[3] = {Scalar(255, 0, 0), Scalar(0, 255, 0), Scalar(0, 0, 255)};
+    Scalar colors[4] = {Scalar(255, 0, 0), Scalar(0, 255, 0),
+                        Scalar(0, 0, 255), Scalar(255, 255, 255)};
     vector<CVLine> all_vertical;
+    cv::Point origin(-src_w + 1, src_h);
     for(int i = 0; i < total_segments; ++i)
     {
         //odd segments starts at half of previous even segment
@@ -64,28 +66,72 @@ void FeatureExtractor::extract_image_parameters()
         vector<CVLine> vertical;
         vector<CVLine> horizontal;
         extract_horiz_vert_lines(approx_contours, bw_segment.size(), segment_start, vertical, horizontal);
+//        for(size_t i = 0; i < vertical.size(); ++i)
+//        {
+//            Scalar color = colors[i%3];
+//            cv::line(drawing, vertical[i].start, vertical[i].end, color, 2);
+//           // cout << all_vertical[i].length << " " << endl;
+//            cout << ::line_point_dist(vertical[i].start, vertical[i].end, origin) << endl;
+//            imshow(win_name2, drawing);
+//            waitKey();
+//        }
 
-        Scalar color = colors[i%3];
-        for(size_t i = 0; i < all_vertical.size(); ++i)
-        {
-           all_vertical[i].shift_right(segment_start);
-           cv::line(drawing, vertical[i].start, vertical[i].end, color, 2);
-        }
-        imshow(win_name2, drawing);
-
-
-        waitKey();
         if(!all_vertical.empty())
-        {
             all_vertical.insert(all_vertical.end(), vertical.begin(), vertical.end());
-        }
         else
-        {
             std::swap(all_vertical, vertical);
-        }
-
     }
 
+    std::sort(all_vertical.begin(), all_vertical.end(),
+              [&origin](CVLine const &first, CVLine const &second)
+    {
+        return ::line_point_dist(first.start, first.end, origin) <
+        ::line_point_dist(second.start, second.end, origin);
+    });
+
+
+    auto last = std::unique(all_vertical.begin(), all_vertical.end(), [src_w](CVLine const& first, CVLine const& second){
+        return (first == second) || first.very_similar(second, src_w*0.005);
+    });
+    all_vertical.erase(last, all_vertical.end());
+    cout << all_vertical.size() << endl;
+
+    for(size_t i = 0; i < all_vertical.size(); ++i)
+    {
+        Scalar color = colors[i%3];
+        cv::line(drawing, all_vertical[i].start, all_vertical[i].end, color, 2);
+       // cout << all_vertical[i].length << " " << endl;
+        cout << ::line_point_dist(all_vertical[i].start, all_vertical[i].end, origin) << endl;
+        imshow(win_name2, drawing);
+    }
+    waitKey();
+    vector<float> lengths;
+    vector<int> labels1(all_vertical.size());
+    for(auto &vert : all_vertical)
+        lengths.push_back(vert.length);
+    TermCriteria TC(TermCriteria::MAX_ITER | TermCriteria::EPS, 30, 1.0);
+    double compactness1 = cv::kmeans(Mat(lengths), 4, Mat(labels1), TC, 10, KMEANS_RANDOM_CENTERS);
+
+    //double compactness2 = kmeans(Mat(lengths), 4, Mat(labels2), TC, 30, KMEANS_RANDOM_CENTERS);
+    vector<int>& labels = labels1;
+    vector<int> label_count(4);
+    for(auto lab : labels1)
+        ++label_count[lab];
+
+    //if(compactness1 > compactness2)
+      //  labels = labels2;
+
+//    for(size_t i = 0; i < labels.size(); ++i)
+//    {
+//        Scalar color = colors[labels[i]];
+//        cv::line(drawing, all_vertical[i].start, all_vertical[i].end, color, 2);
+//        cout << all_vertical[i].length << " " << endl;
+//        imshow(win_name2, drawing);
+//        waitKey();
+//    }
+
+
+    waitKey();
 }
 
 void FeatureExtractor::perform_tresholding(cv::Mat &src, cv::Mat &bw_output)
@@ -161,7 +207,7 @@ void FeatureExtractor::extract_horiz_vert_lines(std::vector<std::vector<cv::Poin
             }
         }
     }
-    cv::Point origin(0, src_sz.height-1);
+    cv::Point origin(-1000, src_sz.height-1);
 
     std::sort(vertical.begin(), vertical.end(),
               [&origin](CVLine const &first, CVLine const &second)

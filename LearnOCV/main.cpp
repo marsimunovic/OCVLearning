@@ -1,5 +1,7 @@
 #include "detectkeyboard.h"
 #include "detectkeys.h"
+#include "sline.h"
+#include "featureextractor.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -26,7 +28,10 @@ int main(int argc, char *argv[])
 
     Mat image;
     image = imread(imageName.c_str(), IMREAD_COLOR); //read the file
-    detectKeys(image);
+    FeatureExtractor FE;
+    FE.import_image(image);
+    FE.extract_image_parameters();
+    //detectKeys(image);
     //detectKeyboard(image, Size(8,5));
     //histTestC1(image);
    // edgeDetection(image);

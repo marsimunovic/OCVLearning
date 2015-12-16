@@ -25,7 +25,8 @@ SOURCES += \
     detectkeys.cpp \
     sline.cpp \
     math_functions.cpp \
-    cvline.cpp
+    cvline.cpp \
+    featureextractor.cpp
 LIBS += `pkg-config opencv --libs`
 
 HEADERS += \
@@ -35,4 +36,5 @@ HEADERS += \
     detectkeys.h \
     sline.h \
     math_functions.h \
-    cvline.h
+    cvline.h \
+    featureextractor.h
