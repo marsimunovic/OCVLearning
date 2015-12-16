@@ -35,3 +35,20 @@ void CVLine::shift_right(int offset)
     start = start + cv::Point(offset, 0);
     end = end + cv::Point(offset, 0);
 }
+
+bool CVLine::operator==(const CVLine &other) const
+{
+    return ((start.x == other.start.x) && (start.y == other.start.y) &&
+            (end.x == other.end.x) && (end.y == other.end.y));
+}
+
+bool CVLine::very_similar(CVLine const& other, double eps_distance) const
+{
+    if(std::abs(inclination - other.inclination) > DEGREE_TO_RAD(5))
+        return false;
+    if(::max_ratio(length, other.length) > 1.1)
+        return false;
+    if(::distance(center_of_simmetry(start, end), center_of_simmetry(other.start, other.end)) > eps_distance)
+        return false;
+    return true;
+}

@@ -1,6 +1,17 @@
 #include "math_functions.h"
 #include <cmath>
 
+
+inline double RAD_TO_DEGREE(double rad)
+{
+    return 180.0*rad/M_PI;
+}
+
+double DEGREE_TO_RAD(double degree)
+{
+    return degree*M_PI/180.0;
+}
+
 //calculates dot product of vectors from A to B and from B to C
 int dot(const cv::Point &A, const cv::Point &B, const cv::Point &C)
 {
@@ -66,5 +77,32 @@ bool max_ratio(double val1, double val2, double &ratio)
 double line_inclination(cv::Point const &A, cv::Point const &B)
 {
     cv::Point delta = B - A;
-    abs(atan(abs(delta.y/(delta.x + 0.00000000001))));
+    return std::abs(atan(std::abs(delta.y/(delta.x + 0.00000000001))));
+}
+
+cv::Point center_of_simmetry(cv::Point const &A, cv::Point const &B)
+{
+    return cv::Point((A.x+B.x)/2, (A.y+B.y)/2);
+}
+
+
+std::pair<bool, cv::Point> line_line_intersection(const cv::Point &A, const cv::Point &B,
+                                                  const cv::Point &C, const cv::Point &D)
+{
+    int dy1 = B.y - A.y;
+    int dx1 = A.x - B.x;
+    int dy2 = D.y - C.y;
+    int dx2 = C.x - D.x;
+    int z1 = dy1*A.x + dx1*A.y;
+    int z2 = dy2*C.x + dx2*C.y;
+
+    int det = dy1*dx2 - dy2*dx1;
+    if(det == 0)
+        return std::pair<bool, cv::Point>(false, cv::Point(0,0));
+    else
+    {
+        double x = static_cast<double>(z1)/det;
+        double y = static_cast<double>(z2)/det;
+        return std::pair<bool, cv::Point>(true, cv::Point(x, y));
+    }
 }
