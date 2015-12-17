@@ -12,6 +12,8 @@ public:
     void import_image(cv::Mat& img_color);
     void extract_image_parameters();
 private:
+
+    void detect_key_candidates(std::vector<CVLine>& vertical_lines);
     void perform_tresholding(cv::Mat& src, cv::Mat &bw_output);
     void extract_contours(cv::Mat& src, std::vector<std::vector<cv::Point>> &contours);
     void extract_horiz_vert_lines(std::vector<std::vector<cv::Point>> &contours,

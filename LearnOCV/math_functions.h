@@ -4,6 +4,7 @@
 #include "opencv2/core/types.hpp"
 
 double DEGREE_TO_RAD(double degree);
+double RAD_TO_DEGREE(double rad);
 
 int dot(cv::Point const& A, cv::Point const& B, cv::Point const& C);
 int cross(cv::Point const& A, cv::Point const& B, cv::Point const& C);

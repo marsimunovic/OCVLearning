@@ -6,6 +6,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/core.hpp>
 
+#include <map>
 #include <vector>
 #include <iostream>
 #include <string>
@@ -54,8 +55,8 @@ void FeatureExtractor::extract_image_parameters()
                          (i < total_segments - 1)? segment_w : last_segment_w, src_h));
         cv::Mat bw_segment(roi_segment[i].size(), CV_8UC1);
         perform_tresholding(roi_segment[i], bw_segment);
-        namedWindow(win_name + char(i + 49), 0);
-        imshow(win_name + char(i + 49), bw_segment);
+        //namedWindow(win_name + char(i + 49), 0);
+        //imshow(win_name + char(i + 49), bw_segment);
         //waitKey();
         //perform analysis of black-n-white segment
         //in order to extract geometrical shapes
@@ -82,29 +83,47 @@ void FeatureExtractor::extract_image_parameters()
             std::swap(all_vertical, vertical);
     }
 
+
+    CVLine middle(cv::Point(0, src_h/2), cv::Point(1, src_h/2));
     std::sort(all_vertical.begin(), all_vertical.end(),
-              [&origin](CVLine const &first, CVLine const &second)
+              [&middle](CVLine const &first, CVLine const &second)
     {
-        return ::line_point_dist(first.start, first.end, origin) <
-        ::line_point_dist(second.start, second.end, origin);
+        auto res1 = ::line_line_intersection(first.start, first.end, middle.start, middle.end);
+        auto res2 = ::line_line_intersection(second.start, second.end, middle.start, middle.end);
+        return (res1.first && res2.first) && (res1.second.x < res2.second.x);
     });
+
+
+//    std::sort(all_vertical.begin(), all_vertical.end(),
+//              [&origin](CVLine const &first, CVLine const &second)
+//    {
+//        return ::line_point_dist(first.start, first.end, origin) <
+//        ::line_point_dist(second.start, second.end, origin);
+//    });
 
 
     auto last = std::unique(all_vertical.begin(), all_vertical.end(), [src_w](CVLine const& first, CVLine const& second){
         return (first == second) || first.very_similar(second, src_w*0.005);
     });
+
     all_vertical.erase(last, all_vertical.end());
     cout << all_vertical.size() << endl;
 
+    auto& previous = all_vertical[0];
     for(size_t i = 0; i < all_vertical.size(); ++i)
     {
+        cout << ::RAD_TO_DEGREE(all_vertical[i].inclination - previous.inclination) << endl;
+        previous = all_vertical[i];
         Scalar color = colors[i%3];
         cv::line(drawing, all_vertical[i].start, all_vertical[i].end, color, 2);
        // cout << all_vertical[i].length << " " << endl;
-        cout << ::line_point_dist(all_vertical[i].start, all_vertical[i].end, origin) << endl;
-        imshow(win_name2, drawing);
+    //    cout << ::line_point_dist(all_vertical[i].start, all_vertical[i].end, origin) << endl;
+        auto res1 = ::line_line_intersection(all_vertical[i].start, all_vertical[i].end, middle.start, middle.end);
+    //    cout << "intersection x = " << res1.second.x << " y = " << res1.second.y << endl;
     }
-    waitKey();
+        imshow(win_name2, drawing);
+        waitKey();
+    detect_key_candidates(all_vertical);
     vector<float> lengths;
     vector<int> labels1(all_vertical.size());
     for(auto &vert : all_vertical)
@@ -132,6 +151,88 @@ void FeatureExtractor::extract_image_parameters()
 
 
     waitKey();
+}
+
+void FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines)
+{
+    std::map<double, std::vector<int>> groups;
+    std::vector<float> y_coords;
+    for(auto& line : vertical_lines)
+    {
+        y_coords.push_back(line.start.y);
+        y_coords.push_back(line.end.y);
+    }
+    std::vector<int> labeles(y_coords.size());
+    std::vector<float> centers_app(3);
+    cv::kmeans(Mat(y_coords), 3, Mat(labeles), TermCriteria(TermCriteria::MAX_ITER, 10, 1.0), 4, KMEANS_RANDOM_CENTERS, Mat(centers_app));
+
+    auto& previous = vertical_lines[0];
+    std::vector<bool> labels(true, vertical_lines.size());
+    int same_cnt = 0;
+    std::vector<int>  indices(vertical_lines.size());
+    indices[0] = 0;
+    for(size_t i = 1; i < vertical_lines.size(); ++i)
+        indices[i] = indices[i-1] + static_cast<int>(
+                    ::max_ratio(vertical_lines[i-1].length, vertical_lines[i].length) > 1.1);
+
+    vector<int> candidates;
+    vector<pair<int, int>> candidate_groups;
+    std::string cand = "";
+
+    int cand_start = 0;
+    int cand_cnt = 0;
+    for(size_t i = 0; i < vertical_lines.size(); ++i)
+    {
+        int state = 0;
+        for(size_t j = i + 1; (j < i + 4) && (j < vertical_lines.size()); ++j)
+        {
+            auto& l1 = vertical_lines[i];
+            auto& l2= vertical_lines[j];
+            double top1top2 = ::max_ratio(l1.start.y, l2.start.y);
+            double bot1bot2 = ::max_ratio(l1.end.y, l2.end.y);
+            double bot1top2 = ::max_ratio(l1.end.y, l2.start.y);
+            double top1bot2 = ::max_ratio(l1.start.y, l2.end.y);
+            //if(max_ratio(vertical_lines[i].length, vertical_lines[j].length) > 1.05)
+              //  continue;
+
+            switch(state)
+            {
+            case 0:
+
+                break;
+            }
+
+            if(top1top2 < 1.05)
+            {
+                if((bot1bot2 < 1.05))
+                {
+                    cout << "candidate for full key (white or black) or  narrow part" << endl;
+                    candidates.push_back(0);
+                    cand += "O";
+                    break;
+                }
+                //continue;
+            }
+
+
+            //if lower of one equal to upper of second T, J or L shaped key
+            if(top1bot2 < 1.05)
+            {
+                candidates.push_back(1);
+                cout << "T or L shaped key" << endl;
+                cand += "L";
+                break;
+            }
+            if(bot1top2 < 1.05)
+            {
+                candidates.push_back(2);
+                cout << "T or J shaped key" << endl;
+                cand += "J";
+                break;
+            }
+        }
+    }
+    cout << cand << endl;
 }
 
 void FeatureExtractor::perform_tresholding(cv::Mat &src, cv::Mat &bw_output)
@@ -207,6 +308,7 @@ void FeatureExtractor::extract_horiz_vert_lines(std::vector<std::vector<cv::Poin
             }
         }
     }
+
     cv::Point origin(-1000, src_sz.height-1);
 
     std::sort(vertical.begin(), vertical.end(),

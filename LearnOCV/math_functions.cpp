@@ -2,7 +2,7 @@
 #include <cmath>
 
 
-inline double RAD_TO_DEGREE(double rad)
+double RAD_TO_DEGREE(double rad)
 {
     return 180.0*rad/M_PI;
 }
@@ -97,12 +97,13 @@ std::pair<bool, cv::Point> line_line_intersection(const cv::Point &A, const cv::
     int z2 = dy2*C.x + dx2*C.y;
 
     int det = dy1*dx2 - dy2*dx1;
+
     if(det == 0)
         return std::pair<bool, cv::Point>(false, cv::Point(0,0));
     else
     {
-        double x = static_cast<double>(z1)/det;
-        double y = static_cast<double>(z2)/det;
+        double x = static_cast<double>(dx2*z1-dx1*z2)/det;
+        double y = static_cast<double>(dy1*z2-dy2*z1)/det;
         return std::pair<bool, cv::Point>(true, cv::Point(x, y));
     }
 }
