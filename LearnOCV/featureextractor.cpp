@@ -198,7 +198,26 @@ void FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines
             switch(state)
             {
             case 0:
-
+                if((top1top2 < 1.1) && (bot1bot2 < 1.1))
+                {
+                    state = 1; //same length
+                }
+                if(top1bot2 < 1.1)
+                {
+                    state = 2; //first is upper, second is lower
+                }
+                if(bot1top2 < 1.1)
+                {
+                    state = 3;
+                }
+               break;
+            case 1:
+                break;
+            case 2:
+                break;
+            case 3:
+                break;
+            default:
                 break;
             }
 
