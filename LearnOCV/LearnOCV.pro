@@ -15,6 +15,7 @@ QMAKE_CXXFLAGS += -std=c++11
 
 TEMPLATE = app
 
+LIBS += `pkg-config opencv --libs`
 
 SOURCES += \
     key.cpp \
@@ -27,7 +28,7 @@ SOURCES += \
     math_functions.cpp \
     cvline.cpp \
     featureextractor.cpp
-LIBS += `pkg-config opencv --libs`
+
 
 HEADERS += \
     key.h \

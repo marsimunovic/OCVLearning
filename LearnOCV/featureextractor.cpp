@@ -11,6 +11,7 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+#include <queue>
 
 using namespace cv;
 using namespace std;
@@ -118,12 +119,18 @@ void FeatureExtractor::extract_image_parameters()
         cv::line(drawing, all_vertical[i].start, all_vertical[i].end, color, 2);
        // cout << all_vertical[i].length << " " << endl;
     //    cout << ::line_point_dist(all_vertical[i].start, all_vertical[i].end, origin) << endl;
-        auto res1 = ::line_line_intersection(all_vertical[i].start, all_vertical[i].end, middle.start, middle.end);
+        //auto res1 = ::line_line_intersection(all_vertical[i].start, all_vertical[i].end, middle.start, middle.end);
+        imshow(win_name2, drawing);
+        //waitKey();
     //    cout << "intersection x = " << res1.second.x << " y = " << res1.second.y << endl;
     }
-        imshow(win_name2, drawing);
-        waitKey();
-    detect_key_candidates(all_vertical);
+
+   // std::vector<float> centers2 = find_best_edges(all_vertical);
+    std::vector<float> centers = detect_key_candidates(all_vertical);
+    for(auto& center : centers)
+        cv::line(drawing, cv::Point(0, center), cv::Point(src_w-1, center), Scalar(255, 255, 255), 2);
+    imshow(win_name2, drawing);
+    waitKey();
     vector<float> lengths;
     vector<int> labels1(all_vertical.size());
     for(auto &vert : all_vertical)
@@ -153,7 +160,16 @@ void FeatureExtractor::extract_image_parameters()
     waitKey();
 }
 
-void FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines)
+static int best_line_fit(CVLine const& line, std::vector<float>& triplet)
+{
+    std::vector<double> minima(3);
+    minima[0] = std::abs(line.start.y - triplet[0]) + std::abs(line.end.y - triplet[2]);
+    minima[1] = std::abs(line.start.y - triplet[0]) + std::abs(line.end.y - triplet[1]);
+    minima[2] = std::abs(line.start.y - triplet[1]) + std::abs(line.end.y - triplet[2]);
+    return std::min_element(minima.begin(), minima.end()) - minima.begin();
+}
+
+std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines)
 {
     std::map<double, std::vector<int>> groups;
     std::vector<float> y_coords;
@@ -164,8 +180,47 @@ void FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines
     }
     std::vector<int> labeles(y_coords.size());
     std::vector<float> centers_app(3);
+
     cv::kmeans(Mat(y_coords), 3, Mat(labeles), TermCriteria(TermCriteria::MAX_ITER, 10, 1.0), 4, KMEANS_RANDOM_CENTERS, Mat(centers_app));
 
+    centers_app = find_best_edges(vertical_lines);
+    std::sort(centers_app.begin(), centers_app.end());
+    vector<pair<int, int>> key_edges;
+    for(size_t i = 0; i < vertical_lines.size(); ++i)
+        key_edges.push_back(pair<int, int>(i, best_line_fit(vertical_lines[i], centers_app)));
+
+    //check if there are more than two repetitions of same line type
+    vector<pair<int, int>> repetitions;
+
+    for(size_t i = 0; i < key_edges.size() - 1; ++i)
+    {
+        int reps = 0;
+        for(size_t j = i + 1; j < key_edges.size(); ++j)
+        {
+            if(key_edges[i].second == key_edges[j].second)
+                ++reps;
+            else
+                break;
+        }
+        if(reps >= 2)
+        repetitions.push_back(pair<int, int>(key_edges[i].first, reps));
+    }
+    vector<vector<CVLine>> key_cand;
+    for(size_t i = 0; i < vertical_lines.size() - 1; ++i)
+    {
+        int reps = 0;
+        for(size_t j = i + 1; j < vertical_lines.size(); ++j)
+        {
+            int incl_diff = std::abs(RAD_TO_DEGREE(vertical_lines[i].inclination - vertical_lines[j].inclination));
+            if(incl_diff > 5)
+                continue;
+        }
+    }
+
+
+    for(auto& key : repetitions)
+        cout << key.first << " " << key.second;
+    cout << endl;
     auto& previous = vertical_lines[0];
     std::vector<bool> labels(true, vertical_lines.size());
     int same_cnt = 0;
@@ -225,7 +280,7 @@ void FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines
             {
                 if((bot1bot2 < 1.05))
                 {
-                    cout << "candidate for full key (white or black) or  narrow part" << endl;
+                  //  cout << "candidate for full key (white or black) or  narrow part" << endl;
                     candidates.push_back(0);
                     cand += "O";
                     break;
@@ -238,20 +293,61 @@ void FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines
             if(top1bot2 < 1.05)
             {
                 candidates.push_back(1);
-                cout << "T or L shaped key" << endl;
+                //cout << "T or L shaped key" << endl;
                 cand += "L";
                 break;
             }
             if(bot1top2 < 1.05)
             {
                 candidates.push_back(2);
-                cout << "T or J shaped key" << endl;
+                //cout << "T or J shaped key" << endl;
                 cand += "J";
                 break;
             }
         }
     }
     cout << cand << endl;
+    return centers_app;
+}
+
+std::vector<float> FeatureExtractor::find_best_edges(std::vector<CVLine> &vertical_lines)
+{
+    std::vector<float> y_coords;
+    for(auto& line : vertical_lines)
+    {
+        y_coords.push_back(line.start.y);
+        y_coords.push_back(line.end.y);
+    }
+    std::vector<int> labeles(y_coords.size());
+    int centers = 2;
+    std::vector<float> centers_app;
+    double error = INFINITY;
+    do
+    {
+        std::vector<float> centers_app_tmp(++centers);
+        double err_tmp = cv::kmeans(Mat(y_coords), centers, Mat(labeles),
+                         TermCriteria(TermCriteria::MAX_ITER, 10, 1.0),
+                         4, KMEANS_RANDOM_CENTERS, Mat(centers_app_tmp));
+        if(err_tmp > error)
+            break;
+        else
+            std::swap(centers_app_tmp, centers_app);
+        error = err_tmp;
+    }while (centers < 3);
+
+    //find n best labels
+    std::vector<int> label_cnt(centers, 0);
+    for(auto& labs : labeles)
+        ++label_cnt[labs];
+    std::vector<float> lines_y;
+    for(size_t i = 0; i < 3; ++i)
+    {
+        auto max_pos = std::max_element(label_cnt.begin(), label_cnt.end());
+        lines_y.push_back(centers_app[max_pos - label_cnt.begin()]);
+        *max_pos = -1.0;
+    }
+
+    return lines_y;
 }
 
 void FeatureExtractor::perform_tresholding(cv::Mat &src, cv::Mat &bw_output)

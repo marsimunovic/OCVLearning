@@ -135,7 +135,7 @@ int readVideo(int argc, char *argv[])
     return 0;
 }
 
-int main(int argc, char *argv[])
+int main1(int argc, char *argv[])
 {
     //readVideo(argc, argv);
     //return 0;
