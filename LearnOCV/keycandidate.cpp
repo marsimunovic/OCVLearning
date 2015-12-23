@@ -1,17 +1,24 @@
 #include "keycandidate.h"
 #include "math_functions.h"
 
+#include <algorithm>
+
 const int MAX_INCLINATION_DIFF_DEGREES = 6;
 const double ALLOWED_RATIO = 1.1;
 const double AR = ALLOWED_RATIO;
 
-KeyCandidate::KeyCandidate(const std::vector<CVLine> &lines, char type)
-    :lines(lines)
-    ,type(type)
+KeyCandidate::KeyCandidate(const std::vector<CVLine> &lines_, char type)
+    :lines(lines_)
+    ,type_(type)
 {
+    if(type == 'B')
+    {
+        std::vector<CVLine> tmp = {lines[0], lines[2]};
+        std::swap(lines, tmp);
+    }
 }
 
-bool KeyCandidate::is_valid_candidate()
+bool KeyCandidate::is_valid_candidate() const
 {
     //first check inclinations
     size_t SZ = lines.size();
@@ -20,8 +27,9 @@ bool KeyCandidate::is_valid_candidate()
         if(::RAD_TO_DEGREE(lines[i].inclination - lines[i+1].inclination) > MAX_INCLINATION_DIFF_DEGREES)
             return false;
     }
-    switch (type) {
+    switch (type_) {
     case 'O':
+    case 'B':
         if(SZ == 2)
         {
             //check top and bottom are in same line
@@ -68,7 +76,7 @@ bool KeyCandidate::is_valid_candidate()
     return false;
 }
 
-std::vector<cv::Point> KeyCandidate::lines_to_polygon()
+std::vector<cv::Point> KeyCandidate::lines_to_polygon() const
 {
     size_t N = lines.size();
     std::vector<cv::Point> points(N*2);
@@ -78,7 +86,7 @@ std::vector<cv::Point> KeyCandidate::lines_to_polygon()
     points[3] = lines[N-1].end;
     if(N > 2)
     {
-        if(type == 'J' || type == 'T')
+        if(type_ == 'J' || type_ == 'T')
         {
             points[4] = lines[N-2].start;
             points[5] = lines[N-2].end;

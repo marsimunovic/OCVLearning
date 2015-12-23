@@ -6,12 +6,32 @@ Key::Key()
 {
 }
 
-Key::Key(std::vector<cv::Point> const& key_coordinates)
+Key::Key(std::vector<cv::Point> const& key_coordinates, char type)
     :key_angles(key_coordinates)
     ,tone('C')
     ,octave_num(1)
     ,layout(WHITE_O)
 {
+    switch(type)
+    {
+    case 'O':
+        layout = WHITE_O;
+        break;
+    case 'B':
+        layout = BLACK;
+        break;
+    case 'J':
+        layout = WHITE_J;
+        break;
+    case 'L':
+        layout = WHITE_L;
+        break;
+    case 'T':
+        layout = WHITE_T;
+        break;
+    default:
+        break;
+    }
 }
 
 void Key::press()
@@ -29,6 +49,7 @@ void Key::release()
 void Key::draw(cv::Mat &src_image)
 {
     size_t i = 0;
+
     for(; i < key_angles.size() - 1; ++i)
     {
         cv::line(src_image, key_angles[i], key_angles[i+1], cv::Scalar(255, 255, 255), 2);

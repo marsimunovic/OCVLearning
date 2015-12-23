@@ -189,14 +189,12 @@ std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> 
     /// 0, 2, 1 - J key
     /// 1, 2, 1 - T key
     /// 1, 2, 0 - L key
-    ///
+    /// 2, 1, 2 - B key
     std::string keyboard = "";
     std::vector<pair<int, int>> key_vertices;
     int sum = 0;
     for(size_t i = 0; i < key_edges.size(); ++i)
     {
-        if(key_edges[i].second == 2)
-            continue;
 
         sum = key_edges[i].second;
         bool spin = true;
@@ -221,11 +219,18 @@ std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> 
                 //possibly T or L key
                 break;
                case 21:
-                keyboard += "J";
-                //check valid J key
-                key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
-                //J key
-                spin = false;
+                if(j - i == 1)
+                {
+                    //possibly black key
+                }
+                else
+                {
+                    keyboard += "J";
+                    //check valid J key
+                    key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
+                    //J key
+                    spin = false;
+                }
                 break;
                case 120:
                 //L key
@@ -237,6 +242,11 @@ std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> 
                case 122:
                 //possibly T key
                 break;
+               case 212:
+                //black key
+                keyboard += "B";
+                key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
+                spin = false;
                case 1221:
                 keyboard += "T";
                 //check valid T key
@@ -265,7 +275,7 @@ std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> 
     namedWindow("Win", 0);
     for(auto &kc : kcs)
     {
-        Key k(kc.lines_to_polygon());
+        Key k(kc.lines_to_polygon(), kc.type());
         k.draw(drawing);
 
     imshow("Win", drawing);

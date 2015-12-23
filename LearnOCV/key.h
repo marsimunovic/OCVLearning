@@ -10,7 +10,7 @@ class Key
 {
 public:
     Key();
-    Key(const std::vector<cv::Point> &key_coordinates);
+    Key(const std::vector<cv::Point> &key_coordinates, char type);
     void press();
     void release();
     void draw(cv::Mat& src_image);
