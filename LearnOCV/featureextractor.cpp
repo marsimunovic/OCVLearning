@@ -1,6 +1,8 @@
 #include "featureextractor.h"
 #include "math_functions.h"
 #include "cvline.h"
+#include "keycandidate.h"
+#include "key.h"
 
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -108,12 +110,12 @@ void FeatureExtractor::extract_image_parameters()
     });
 
     all_vertical.erase(last, all_vertical.end());
-    cout << all_vertical.size() << endl;
+    //cout << all_vertical.size() << endl;
 
     auto& previous = all_vertical[0];
     for(size_t i = 0; i < all_vertical.size(); ++i)
     {
-        cout << ::RAD_TO_DEGREE(all_vertical[i].inclination - previous.inclination) << endl;
+        //cout << ::RAD_TO_DEGREE(all_vertical[i].inclination - previous.inclination) << endl;
         previous = all_vertical[i];
         Scalar color = colors[i%3];
         cv::line(drawing, all_vertical[i].start, all_vertical[i].end, color, 2);
@@ -126,7 +128,7 @@ void FeatureExtractor::extract_image_parameters()
     }
 
    // std::vector<float> centers2 = find_best_edges(all_vertical);
-    std::vector<float> centers = detect_key_candidates(all_vertical);
+    std::vector<float> centers = detect_key_candidates(all_vertical, src.size());
     for(auto& center : centers)
         cv::line(drawing, cv::Point(0, center), cv::Point(src_w-1, center), Scalar(255, 255, 255), 2);
     imshow(win_name2, drawing);
@@ -136,10 +138,9 @@ void FeatureExtractor::extract_image_parameters()
     for(auto &vert : all_vertical)
         lengths.push_back(vert.length);
     TermCriteria TC(TermCriteria::MAX_ITER | TermCriteria::EPS, 30, 1.0);
-    double compactness1 = cv::kmeans(Mat(lengths), 4, Mat(labels1), TC, 10, KMEANS_RANDOM_CENTERS);
+    cv::kmeans(Mat(lengths), 4, Mat(labels1), TC, 10, KMEANS_RANDOM_CENTERS);
 
     //double compactness2 = kmeans(Mat(lengths), 4, Mat(labels2), TC, 30, KMEANS_RANDOM_CENTERS);
-    vector<int>& labels = labels1;
     vector<int> label_count(4);
     for(auto lab : labels1)
         ++label_count[lab];
@@ -169,25 +170,107 @@ static int best_line_fit(CVLine const& line, std::vector<float>& triplet)
     return std::min_element(minima.begin(), minima.end()) - minima.begin();
 }
 
-std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines)
+std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> &vertical_lines, cv::Size sz)
 {
-    std::map<double, std::vector<int>> groups;
-    std::vector<float> y_coords;
-    for(auto& line : vertical_lines)
-    {
-        y_coords.push_back(line.start.y);
-        y_coords.push_back(line.end.y);
-    }
-    std::vector<int> labeles(y_coords.size());
+
     std::vector<float> centers_app(3);
-
-    cv::kmeans(Mat(y_coords), 3, Mat(labeles), TermCriteria(TermCriteria::MAX_ITER, 10, 1.0), 4, KMEANS_RANDOM_CENTERS, Mat(centers_app));
-
     centers_app = find_best_edges(vertical_lines);
     std::sort(centers_app.begin(), centers_app.end());
+
     vector<pair<int, int>> key_edges;
     for(size_t i = 0; i < vertical_lines.size(); ++i)
         key_edges.push_back(pair<int, int>(i, best_line_fit(vertical_lines[i], centers_app)));
+    for(auto key : key_edges)
+        cout << key.second;
+    cout << endl;
+    cout << endl;
+    ///combinations:
+    /// 0, 0 - full key
+    /// 0, 2, 1 - J key
+    /// 1, 2, 1 - T key
+    /// 1, 2, 0 - L key
+    ///
+    std::string keyboard = "";
+    std::vector<pair<int, int>> key_vertices;
+    int sum = 0;
+    for(size_t i = 0; i < key_edges.size(); ++i)
+    {
+        if(key_edges[i].second == 2)
+            continue;
+
+        sum = key_edges[i].second;
+        bool spin = true;
+        for(size_t j = i + 1; (j < key_edges.size()) && spin; ++j)
+        {
+            sum = 10*sum + key_edges[j].second;
+            cout << sum << endl;
+            switch(sum)
+            {
+               case 0:
+                //full key
+                keyboard += "O";
+                //check valid full key
+
+                key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
+
+                spin = false;
+                break;
+               case 2:
+                //possibly J key
+               case 12:
+                //possibly T or L key
+                break;
+               case 21:
+                keyboard += "J";
+                //check valid J key
+                key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
+                //J key
+                spin = false;
+                break;
+               case 120:
+                //L key
+                keyboard += "L";
+                //check valid L key
+                key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
+                spin = false;
+                break;
+               case 122:
+                //possibly T key
+                break;
+               case 1221:
+                keyboard += "T";
+                //check valid T key
+                key_vertices.push_back(std::pair<int, int>(i, j - i + 1));
+                spin = false;
+               default:
+                spin = false;
+                //Error
+                break;
+            }
+        }
+    }
+    std::cout << std::endl << keyboard << std::endl;
+
+    std::vector<KeyCandidate> kcs;
+    for(size_t i = 0; i < keyboard.size(); ++i)
+    {
+        int st_ind = key_vertices[i].first;
+        int num = key_vertices[i].second;
+        KeyCandidate KC(std::vector<CVLine>(&vertical_lines[st_ind], &vertical_lines[st_ind+num]), keyboard[i]);
+        if(KC.is_valid_candidate())
+            kcs.push_back(KC);
+    }
+
+    Mat drawing = Mat::zeros(sz, CV_8UC3);
+    namedWindow("Win", 0);
+    for(auto &kc : kcs)
+    {
+        Key k(kc.lines_to_polygon());
+        k.draw(drawing);
+
+    imshow("Win", drawing);
+    waitKey();
+    }
 
     //check if there are more than two repetitions of same line type
     vector<pair<int, int>> repetitions;
@@ -205,108 +288,14 @@ std::vector<float>  FeatureExtractor::detect_key_candidates(std::vector<CVLine> 
         if(reps >= 2)
         repetitions.push_back(pair<int, int>(key_edges[i].first, reps));
     }
-    vector<vector<CVLine>> key_cand;
-    for(size_t i = 0; i < vertical_lines.size() - 1; ++i)
-    {
-        int reps = 0;
-        for(size_t j = i + 1; j < vertical_lines.size(); ++j)
-        {
-            int incl_diff = std::abs(RAD_TO_DEGREE(vertical_lines[i].inclination - vertical_lines[j].inclination));
-            if(incl_diff > 5)
-                continue;
-        }
-    }
 
-
-    for(auto& key : repetitions)
-        cout << key.first << " " << key.second;
-    cout << endl;
-    auto& previous = vertical_lines[0];
-    std::vector<bool> labels(true, vertical_lines.size());
-    int same_cnt = 0;
     std::vector<int>  indices(vertical_lines.size());
     indices[0] = 0;
     for(size_t i = 1; i < vertical_lines.size(); ++i)
         indices[i] = indices[i-1] + static_cast<int>(
                     ::max_ratio(vertical_lines[i-1].length, vertical_lines[i].length) > 1.1);
 
-    vector<int> candidates;
-    vector<pair<int, int>> candidate_groups;
-    std::string cand = "";
 
-    int cand_start = 0;
-    int cand_cnt = 0;
-    for(size_t i = 0; i < vertical_lines.size(); ++i)
-    {
-        int state = 0;
-        for(size_t j = i + 1; (j < i + 4) && (j < vertical_lines.size()); ++j)
-        {
-            auto& l1 = vertical_lines[i];
-            auto& l2= vertical_lines[j];
-            double top1top2 = ::max_ratio(l1.start.y, l2.start.y);
-            double bot1bot2 = ::max_ratio(l1.end.y, l2.end.y);
-            double bot1top2 = ::max_ratio(l1.end.y, l2.start.y);
-            double top1bot2 = ::max_ratio(l1.start.y, l2.end.y);
-            //if(max_ratio(vertical_lines[i].length, vertical_lines[j].length) > 1.05)
-              //  continue;
-
-            switch(state)
-            {
-            case 0:
-                if((top1top2 < 1.1) && (bot1bot2 < 1.1))
-                {
-                    state = 1; //same length
-                }
-                if(top1bot2 < 1.1)
-                {
-                    state = 2; //first is upper, second is lower
-                }
-                if(bot1top2 < 1.1)
-                {
-                    state = 3;
-                }
-               break;
-            case 1:
-                break;
-            case 2:
-                break;
-            case 3:
-                break;
-            default:
-                break;
-            }
-
-            if(top1top2 < 1.05)
-            {
-                if((bot1bot2 < 1.05))
-                {
-                  //  cout << "candidate for full key (white or black) or  narrow part" << endl;
-                    candidates.push_back(0);
-                    cand += "O";
-                    break;
-                }
-                //continue;
-            }
-
-
-            //if lower of one equal to upper of second T, J or L shaped key
-            if(top1bot2 < 1.05)
-            {
-                candidates.push_back(1);
-                //cout << "T or L shaped key" << endl;
-                cand += "L";
-                break;
-            }
-            if(bot1top2 < 1.05)
-            {
-                candidates.push_back(2);
-                //cout << "T or J shaped key" << endl;
-                cand += "J";
-                break;
-            }
-        }
-    }
-    cout << cand << endl;
     return centers_app;
 }
 

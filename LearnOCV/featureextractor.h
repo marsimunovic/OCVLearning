@@ -13,7 +13,7 @@ public:
     void extract_image_parameters();
 private:
 
-    std::vector<float> detect_key_candidates(std::vector<CVLine>& vertical_lines);
+    std::vector<float> detect_key_candidates(std::vector<CVLine>& vertical_lines, cv::Size sz);
     std::vector<float> find_best_edges(std::vector<CVLine>& vertical_lines);
     void perform_tresholding(cv::Mat& src, cv::Mat &bw_output);
     void extract_contours(cv::Mat& src, std::vector<std::vector<cv::Point>> &contours);

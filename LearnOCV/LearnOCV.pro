@@ -27,7 +27,8 @@ SOURCES += \
     sline.cpp \
     math_functions.cpp \
     cvline.cpp \
-    featureextractor.cpp
+    featureextractor.cpp \
+    keycandidate.cpp
 
 
 HEADERS += \
@@ -38,4 +39,5 @@ HEADERS += \
     sline.h \
     math_functions.h \
     cvline.h \
-    featureextractor.h
+    featureextractor.h \
+    keycandidate.h

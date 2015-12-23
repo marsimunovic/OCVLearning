@@ -522,55 +522,20 @@ int detect_key_candidates(cv::Mat &src, vector<vector<Point>>& approx_contours)
     return 0;
 }
 
-// helper function:
-// finds a cosine of angle between vectors
-// from pt0->pt1 and from pt0->pt2
-static double angle( Point pt1, Point pt2, Point pt0 )
-{
-    double dx1 = pt1.x - pt0.x;
-    double dy1 = pt1.y - pt0.y;
-    double dx2 = pt2.x - pt0.x;
-    double dy2 = pt2.y - pt0.y;
-    return acos((dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10));
-}
+//// helper function:
+//// finds a cosine of angle between vectors
+//// from pt0->pt1 and from pt0->pt2
+//static double angle( Point pt1, Point pt2, Point pt0 )
+//{
+//    double dx1 = pt1.x - pt0.x;
+//    double dy1 = pt1.y - pt0.y;
+//    double dx2 = pt2.x - pt0.x;
+//    double dy2 = pt2.y - pt0.y;
+//    return acos((dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10));
+//}
 
 
 
-void extract_geometry(vector<vector<cv::Point>> &approx_contours, cv::Size src_sz)
-{
-    //first extract average vertical and horizontal orientation
-    //find all possible key candidates using contours
-    Mat drawing = Mat::zeros(src_sz, CV_8UC1);
-    namedWindow("StepbyStep", 0);
-
-    for(auto &approx_contour : approx_contours)
-    {
-
-        int min_distance = MAX(src_sz.width, src_sz.height);
-        cv::Point contour_start = approx_contour[0];
-        size_t N_points = approx_contour.size();
-        cv::Point contour_end = approx_contour[N_points-1];
-        cv::line(drawing, approx_contour[0], approx_contour[1], 255, 2);
-        for(size_t i = 1; i < N_points-1; ++i)
-        {
-            //calculate angle between contours
-            //SLine l1(approx_contour[i], approx_contour[i-1]);
-            //SLine l2(approx_contour[i], approx_contour[i+1]);
-
-            double rad = angle(approx_contour[i-1], approx_contour[i+1], approx_contour[i]);
-            double distance = cv::norm(approx_contour[i] - contour_start);
-            cv::line(drawing, approx_contour[i], approx_contour[i+1], 255, 2);
-            std::cout << "angle = " << 180.0*rad/M_PI << std::endl;
-            //        cout << "x1 = " << pt1.x << " y1 = " << pt1.y << "x2 = " << pt2.x << " y2 = " << pt2.y << endl;
-            imshow("StepbyStep", drawing);
-            waitKey(0);
-
-
-
-        }
-    }
-
-}
 
 int detectKeys(cv::Mat& src)
 {
@@ -625,8 +590,6 @@ int detectKeys(cv::Mat& src)
         //use detected lines to detect possible keys
         detect_key_candidates(quarter[i], approx_contours);
 
-
-        //extract_geometry(approx_contours, bw_quarter[i].size());
 
         namedWindow(win_name + char(i + 49), 0);
         imshow(win_name + char(i + 49), bw_quarter[i]);
