@@ -53,14 +53,19 @@ double line_point_dist(const cv::Point &A, const cv::Point &B, const cv::Point &
 }
 
 //maximized ratio between two values
-double max_ratio(double val1, double val2)
+double max_ratio(double const  val1, double const val2)
 {
     return (val1 > val2) ? (val1/val2) : (val2/val1);
 }
 
+bool allowed_max_ratio(double const val1, double const val2, double const allowed)
+{
+    return max_ratio(val1, val2) < allowed;
+}
+
 //maximized ratio between two values
 //returns true if val1 is bigger than val2
-bool max_ratio(double val1, double val2, double &ratio)
+bool max_ratio(double const val1, double const val2, double &ratio)
 {
     if(val1 > val2)
     {
